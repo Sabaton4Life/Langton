@@ -13,17 +13,17 @@ public:
 
 private:
     int rank_, nprocs_, cols_;
-    std::vector<uint8_t> topGhostBuffer_, bottomGhostBuffer_;
+    std::vector<uint8_t> topGhostBuffer_, bottomGhostBuffer_, topReceived_, bottomReceived_;
 };
 
 class AgentMigration {
 public:
-    AgentMigration(int rank, int nprocs, int gridSize);
+    AgentMigration(int rank, int nprocs, int gridSize, int rowStart, int rowEnd);
 
     std::vector<Ant> getMigratingAnts(const std::vector<Ant>& ants);
     void sendAgents(const std::vector<Ant>& agents);
     std::vector<Ant> receiveAgents();
 
 private:
-    int rank_, nprocs_, gridSize_;
+    int rank_, nprocs_, gridSize_, rowStart_, rowEnd_;
 };

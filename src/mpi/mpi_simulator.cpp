@@ -16,7 +16,9 @@ MPISimulator::MPISimulator(int gridSize, int numSteps, int numAnts)
 
     partition_ = std::make_unique<DomainPartition>(rank_, nprocs_, gridSize_);
     ghostExchange_ = std::make_unique<GhostRowExchange>(rank_, nprocs_, gridSize_);
-    agentMigration_ = std::make_unique<AgentMigration>(rank_, nprocs_, gridSize_);
+    agentMigration_ = std::make_unique<AgentMigration>(rank_, nprocs_, gridSize_,
+                                                     partition_->getRowStart(),
+                                                     partition_->getRowEnd());
 
     int localRows = partition_->getLocalRows();
     gridLocal_ = Grid(localRows, gridSize_);
@@ -34,37 +36,26 @@ void MPISimulator::initializeAnts() {
     }
 }
 
-std::vector<Ant> MPISimulator::updateAnts() {
-    std::vector<Ant> localAnts, migratingAnts;
+void MPISimulator::updateAnts() {
+    int rowStart = partition_->getRowStart();
+    int rowEnd = partition_->getRowEnd();
 
-    for (const auto& ant : ants_) {
-        int globalRow = ant.y;
-        int rowStart = partition_->getRowStart();
-        int rowEnd = partition_->getRowEnd();
+    for (auto& ant : ants_) {
+        // Doar furnicile aflate în domeniul local sunt procesate
+        if (ant.y >= rowStart && ant.y < rowEnd) {
+            int localRow = ant.y - rowStart;
+            bool isBlack = gridLocal_.get(localRow, ant.x);
 
-        if (globalRow >= rowStart && globalRow < rowEnd) {
-            localAnts.push_back(ant);
-        } else {
-            migratingAnts.push_back(ant);
+            if (isBlack) ant.rotateLeft();
+            else ant.rotateRight();
+
+            gridLocal_.flip(localRow, ant.x);
+
+            auto [nextX, nextY] = ant.getNextPosition();
+            ant.x = nextX;
+            ant.y = nextY;
         }
     }
-
-    for (auto& ant : localAnts) {
-        int localRow = ant.y - partition_->getRowStart();
-        bool isBlack = gridLocal_.get(localRow, ant.x);
-
-        if (isBlack) ant.rotateLeft();
-        else ant.rotateRight();
-
-        gridLocal_.flip(localRow, ant.x);
-
-        auto [nextX, nextY] = ant.getNextPosition();
-        ant.x = nextX;
-        ant.y = nextY;
-    }
-
-    ants_ = localAnts;
-    return migratingAnts;
 }
 
 void MPISimulator::collectGrid() {
@@ -123,9 +114,18 @@ void MPISimulator::run() {
         ghostExchange_->exchangeRows(gridLocal_, partition_->getLocalRows());
 
         // 2. Calcul local
-        auto migrating = updateAnts();
+        updateAnts();
 
         // 3. Migrare furnici între procese
+        auto migrating = agentMigration_->getMigratingAnts(ants_);
+        
+        // Eliminăm furnicile care părăsesc domeniul din lista locală
+        ants_.erase(std::remove_if(ants_.begin(), ants_.end(),
+            [this](const Ant& a) {
+                return a.y < partition_->getRowStart() || a.y >= partition_->getRowEnd() ||
+                       a.x < 0 || a.x >= gridSize_;
+            }), ants_.end());
+
         agentMigration_->sendAgents(migrating);
         auto incoming = agentMigration_->receiveAgents();
         

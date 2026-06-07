@@ -5,49 +5,41 @@
 
 GhostRowExchange::GhostRowExchange(int rank, int nprocs, int cols)
     : rank_(rank), nprocs_(nprocs), cols_(cols),
-      topGhostBuffer_(cols, 0), bottomGhostBuffer_(cols, 0) {}
+      topGhostBuffer_(cols, 0), bottomGhostBuffer_(cols, 0),
+      topReceived_(cols, 0), bottomReceived_(cols, 0) {}
 
 void GhostRowExchange::exchangeRows(Grid& grid, int localRows) {
     int cols = grid.getCols();
 
-    // Copy boundary rows to buffers
     for (int c = 0; c < cols; ++c) {
         topGhostBuffer_[c] = grid.get(0, c) ? 1 : 0;
         bottomGhostBuffer_[c] = grid.get(localRows - 1, c) ? 1 : 0;
     }
 
-    // Exchange with neighbors using MPI_Sendrecv
-    std::vector<uint8_t> topReceived(cols, 0), bottomReceived(cols, 0);
-
     if (rank_ > 0) {
         MPI_Sendrecv(topGhostBuffer_.data(), cols, MPI_UINT8_T, rank_ - 1, 0,
-                     topReceived.data(), cols, MPI_UINT8_T, rank_ - 1, 1,
+                     topReceived_.data(), cols, MPI_UINT8_T, rank_ - 1, 1,
                      MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
-
     if (rank_ < nprocs_ - 1) {
         MPI_Sendrecv(bottomGhostBuffer_.data(), cols, MPI_UINT8_T, rank_ + 1, 1,
-                     bottomReceived.data(), cols, MPI_UINT8_T, rank_ + 1, 0,
+                     bottomReceived_.data(), cols, MPI_UINT8_T, rank_ + 1, 0,
                      MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
-    // Aplicăm datele primite în rândurile de graniță ale grilei locale
-    // pentru a asigura consistența stării automatului celular.
     for (int c = 0; c < cols; ++c) {
-        if (rank_ > 0) grid.set(0, c, topReceived[c] != 0);
-        if (rank_ < nprocs_ - 1) grid.set(localRows - 1, c, bottomReceived[c] != 0);
+        if (rank_ > 0) grid.set(0, c, topReceived_[c] != 0);
+        if (rank_ < nprocs_ - 1) grid.set(localRows - 1, c, bottomReceived_[c] != 0);
     }
 }
 
-AgentMigration::AgentMigration(int rank, int nprocs, int gridSize)
-    : rank_(rank), nprocs_(nprocs), gridSize_(gridSize) {}
+AgentMigration::AgentMigration(int rank, int nprocs, int gridSize, int rowStart, int rowEnd)
+    : rank_(rank), nprocs_(nprocs), gridSize_(gridSize), rowStart_(rowStart), rowEnd_(rowEnd) {}
 
 std::vector<Ant> AgentMigration::getMigratingAnts(const std::vector<Ant>& ants) {
     std::vector<Ant> migrating;
-    // Această metodă devine redundantă dacă facem split-ul în simulator, 
-    // dar o lăsăm pentru consistența API-ului.
     for (const auto& ant : ants) {
-        if (ant.x < 0 || ant.x >= gridSize_ || ant.y < 0 || ant.y >= gridSize_) {
+        if (ant.y < rowStart_ || ant.y >= rowEnd_ || ant.x < 0 || ant.x >= gridSize_) {
             migrating.push_back(ant);
         }
     }
@@ -56,13 +48,11 @@ std::vector<Ant> AgentMigration::getMigratingAnts(const std::vector<Ant>& ants) 
 
 void AgentMigration::sendAgents(const std::vector<Ant>& agents) {
     std::vector<Ant> toUp, toDown;
-    int rowStart = rank_ * gridSize_ / nprocs_;
-    int rowEnd = (rank_ + 1) * gridSize_ / nprocs_;
 
     for (const auto& ant : agents) {
-        if (ant.y < rowStart && rank_ > 0) {
+        if (ant.y < rowStart_ && rank_ > 0) {
             toUp.push_back(ant);
-        } else if (ant.y >= rowEnd && rank_ < nprocs_ - 1) {
+        } else if (ant.y >= rowEnd_ && rank_ < nprocs_ - 1) {
             toDown.push_back(ant);
         }
     }
