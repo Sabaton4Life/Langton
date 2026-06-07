@@ -34,8 +34,8 @@ void MPISimulator::initializeAnts() {
     }
 }
 
-void MPISimulator::updateAnts() {
-    std::vector<Ant> localAnts, migratingAnts, receivedAnts;
+std::vector<Ant> MPISimulator::updateAnts() {
+    std::vector<Ant> localAnts, migratingAnts;
 
     for (const auto& ant : ants_) {
         int globalRow = ant.y;
@@ -64,6 +64,7 @@ void MPISimulator::updateAnts() {
     }
 
     ants_ = localAnts;
+    return migratingAnts;
 }
 
 void MPISimulator::collectGrid() {
@@ -118,7 +119,18 @@ void MPISimulator::run() {
     Timer timer("MPI simulation");
 
     for (int step = 0; step < numSteps_; ++step) {
-        updateAnts();
+        // 1. Sincronizare rânduri ghost (consistență la granițe)
+        ghostExchange_->exchangeRows(gridLocal_, partition_->getLocalRows());
+
+        // 2. Calcul local
+        auto migrating = updateAnts();
+
+        // 3. Migrare furnici între procese
+        agentMigration_->sendAgents(migrating);
+        auto incoming = agentMigration_->receiveAgents();
+        
+        // Adăugăm furnicile primite la lista locală
+        ants_.insert(ants_.end(), incoming.begin(), incoming.end());
 
         if (step == 0 || step == 499 || step == 9999 || step == numSteps_ - 1) {
             if (rank_ == 0) {
