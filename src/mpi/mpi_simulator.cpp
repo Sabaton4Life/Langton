@@ -1,7 +1,12 @@
 #include "mpi/simulator.hpp"
+#include "utils/io.hpp"
+#include "utils/timing.hpp"
 #include <mpi.h>
 #include <iostream>
 #include <iomanip>
+#include <vector>
+#include <algorithm>
+#include <cstdint>
 
 MPISimulator::MPISimulator(int gridSize, int numSteps, int numAnts)
     : gridSize_(gridSize), numSteps_(numSteps), numAnts_(numAnts),
@@ -14,7 +19,7 @@ MPISimulator::MPISimulator(int gridSize, int numSteps, int numAnts)
     agentMigration_ = std::make_unique<AgentMigration>(rank_, nprocs_, gridSize_);
 
     int localRows = partition_->getLocalRows();
-    gridLocal_ = Grid(localRows + 2, gridSize_); // +2 for ghost rows
+    gridLocal_ = Grid(localRows, gridSize_);
 
     initializeAnts();
 }
@@ -30,34 +35,89 @@ void MPISimulator::initializeAnts() {
 }
 
 void MPISimulator::updateAnts() {
-    for (auto& ant : ants_) {
-        bool isBlack = gridLocal_.get(ant.y, ant.x);
+    std::vector<Ant> localAnts, migratingAnts, receivedAnts;
 
-        if (isBlack) {
-            ant.rotateLeft();
+    for (const auto& ant : ants_) {
+        int globalRow = ant.y;
+        int rowStart = partition_->getRowStart();
+        int rowEnd = partition_->getRowEnd();
+
+        if (globalRow >= rowStart && globalRow < rowEnd) {
+            localAnts.push_back(ant);
         } else {
-            ant.rotateRight();
+            migratingAnts.push_back(ant);
         }
+    }
 
-        gridLocal_.flip(ant.y, ant.x);
+    for (auto& ant : localAnts) {
+        int localRow = ant.y - partition_->getRowStart();
+        bool isBlack = gridLocal_.get(localRow, ant.x);
+
+        if (isBlack) ant.rotateLeft();
+        else ant.rotateRight();
+
+        gridLocal_.flip(localRow, ant.x);
 
         auto [nextX, nextY] = ant.getNextPosition();
         ant.x = nextX;
         ant.y = nextY;
     }
+
+    ants_ = localAnts;
 }
 
 void MPISimulator::collectGrid() {
-    // TODO: Implement MPI_Gather
+    // Simple gather to rank 0
+    if (rank_ == 0) {
+        Grid globalGrid(gridSize_, gridSize_);
+        int rowStart = partition_->getRowStart();
+        int localRows = partition_->getLocalRows();
+
+        for (int r = 0; r < localRows; ++r) {
+            for (int c = 0; c < gridSize_; ++c) {
+                globalGrid.set(rowStart + r, c, gridLocal_.get(r, c));
+            }
+        }
+
+        std::vector<uint8_t> recvBuf;
+        for (int p = 1; p < nprocs_; ++p) {
+            DomainPartition ppart(p, nprocs_, gridSize_);
+            int prows = ppart.getLocalRows();
+            recvBuf.resize(prows * gridSize_);
+
+            MPI_Recv(recvBuf.data(), prows * gridSize_, MPI_UINT8_T, p, 0,
+                    MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+            for (int r = 0; r < prows; ++r) {
+                for (int c = 0; c < gridSize_; ++c) {
+                    globalGrid.set(ppart.getRowStart() + r, c,
+                                  recvBuf[r * gridSize_ + c] != 0);
+                }
+            }
+        }
+    } else {
+        std::vector<uint8_t> sendBuf;
+        int localRows = partition_->getLocalRows();
+        for (int r = 0; r < localRows; ++r) {
+            for (int c = 0; c < gridSize_; ++c) {
+                sendBuf.push_back(gridLocal_.get(r, c) ? 1 : 0);
+            }
+        }
+        MPI_Send(sendBuf.data(), localRows * gridSize_, MPI_UINT8_T, 0, 0,
+                MPI_COMM_WORLD);
+    }
 }
 
 void MPISimulator::run() {
     if (rank_ == 0) {
         std::cout << "Running MPI simulation on " << nprocs_ << " processes\n";
+        std::cout << "Grid: " << gridSize_ << "x" << gridSize_ << ", steps: "
+                  << numSteps_ << ", ants: " << numAnts_ << "\n";
     }
 
+    Timer timer("MPI simulation");
+
     for (int step = 0; step < numSteps_; ++step) {
-        ghostExchange_->exchangeRows(gridLocal_, partition_->getLocalRows());
         updateAnts();
 
         if (step == 0 || step == 499 || step == 9999 || step == numSteps_ - 1) {
@@ -65,5 +125,10 @@ void MPISimulator::run() {
                 std::cout << "Step " << std::setw(6) << step << "\n";
             }
         }
+    }
+
+    if (rank_ == 0) {
+        timer.print();
+        std::cout << "MPI Simulation complete.\n";
     }
 }

@@ -2,15 +2,12 @@
 #include "../utils/io.hpp"
 #include <iostream>
 #include <iomanip>
-#include <cmath>
+#include <map>
 #include <algorithm>
 
 SequentialSimulator::SequentialSimulator(int gridSize, int numSteps, int numAnts)
     : gridSize_(gridSize), numSteps_(numSteps), grid_(gridSize, gridSize) {
     initializeAnts();
-    for (auto& ant : ants_) {
-        ant.id = ants_.size();
-    }
     for (int i = 0; i < numAnts; ++i) {
         ants_.push_back(Ant(gridSize / 2, gridSize / 2, Direction::NORTH, i));
     }
@@ -21,36 +18,34 @@ void SequentialSimulator::initializeAnts() {
 }
 
 void SequentialSimulator::updateAnts() {
-    std::vector<Ant> newAnts;
+    std::map<std::pair<int,int>, std::vector<int>> cellToAnts;
 
+    // Step 1: Compute rotations and flips
     for (auto& ant : ants_) {
         bool isBlack = grid_.get(ant.y, ant.x);
-
-        if (isBlack) {
-            ant.rotateLeft();
-        } else {
-            ant.rotateRight();
-        }
-
+        if (isBlack) ant.rotateLeft();
+        else ant.rotateRight();
         grid_.flip(ant.y, ant.x);
+    }
 
+    // Step 2: Move ants (keep those in bounds)
+    std::vector<Ant> newAnts;
+    for (auto& ant : ants_) {
         auto [nextX, nextY] = ant.getNextPosition();
-
-        // Check boundaries (fixed borders stay white)
         if (nextX >= 0 && nextX < gridSize_ && nextY >= 0 && nextY < gridSize_) {
             ant.x = nextX;
             ant.y = nextY;
             newAnts.push_back(ant);
+            cellToAnts[{ant.x, ant.y}].push_back(ant.id);
         }
-        // Ant leaves grid: removed
     }
 
+    // Step 3: Handle conflicts (if multiple ants on same cell, keep all - they interact dynamically)
     ants_ = newAnts;
 }
 
 void SequentialSimulator::handleConflicts() {
-    // Conflicts handled implicitly: last ant to modify cell wins
-    // This is deterministic if we process ants in consistent order
+    // Conflicts are resolved during movement (deterministic order)
 }
 
 void SequentialSimulator::run() {
@@ -62,7 +57,7 @@ void SequentialSimulator::run() {
 
         if (step == 0 || step == 499 || step == 999 || step == 4999 ||
             step == 9999 || step == 49999 || step == numSteps_ - 1) {
-            std::cout << "Step " << std::setw(6) << step << ": " << ants_.size() << " ants\n";
+            std::cout << "Step " << std::setw(6) << step << ": " << ants_.size() << " ants alive\n";
         }
     }
 
