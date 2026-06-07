@@ -1,0 +1,83 @@
+{
+  "strong_scaling": [
+    {
+      "procs": 1,
+      "grid": 5000,
+      "steps": 10000,
+      "ants": 10,
+      "time": 2.383460760116577,
+      "speedup": 1.0,
+      "efficiency": 100.0,
+      "success": true
+    },
+    {
+      "procs": 2,
+      "grid": 5000,
+      "steps": 10000,
+      "ants": 10,
+      "time": 1.1417365074157715,
+      "speedup": 2.0875751494636434,
+      "efficiency": 104.37875747318218,
+      "success": true
+    },
+    {
+      "procs": 4,
+      "grid": 5000,
+      "steps": 10000,
+      "ants": 10,
+      "time": 1.1393039226531982,
+      "speedup": 2.0920324355295823,
+      "efficiency": 52.30081088823956,
+      "success": true
+    },
+    {
+      "procs": 8,
+      "grid": 5000,
+      "steps": 10000,
+      "ants": 10,
+      "time": 1.1529841423034668,
+      "speedup": 2.0672103567312092,
+      "efficiency": 25.840129459140115,
+      "success": true
+    }
+  ],
+  "weak_scaling": [
+    {
+      "procs": 1,
+      "grid": 500,
+      "steps": 10000,
+      "ants": 10,
+      "cells_per_proc": 250000.0,
+      "time": 1.1335811614990234,
+      "time_ratio": 1.0,
+      "success": true
+    },
+    {
+      "procs": 2,
+      "grid": 707,
+      "steps": 10000,
+      "ants": 10,
+      "cells_per_proc": 249924.5,
+      "time": 1.13643479347229,
+      "time_ratio": 1.002517360088706,
+      "success": true
+    },
+    {
+      "procs": 4,
+      "grid": 1000,
+      "steps": 10000,
+      "ants": 10,
+      "cells_per_proc": 250000.0,
+      "time": 1.1425297260284424,
+      "time_ratio": 1.0078940660213385,
+      "success": true
+    }
+  ],
+  "quick_tests": [
+    {
+      "sequential_time": 0.015630006790161133,
+      "mpi1_time": 1.136610746383667,
+      "mpi4_time": 1.143686056137085
+    }
+  ]
+}
