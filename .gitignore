@@ -1,0 +1,13 @@
+build/
+.vscode/
+*.o
+*.a
+*.so
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.ppm
+output_*/
+bench_p*/
+*.gch
