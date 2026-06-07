@@ -1,13 +1,24 @@
+# Build directory
 build/
+bin/
+obj/
+
+# Executables
+langton_seq
+langton_mpi
+test_*
+
+# IDEs and editors
 .vscode/
-*.o
-*.a
-*.so
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Simulation outputs
 *.ppm
-output_*/
-bench_p*/
-*.gch
+output/
