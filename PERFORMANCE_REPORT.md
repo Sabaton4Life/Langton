@@ -1,7 +1,9 @@
 # PERFORMANCE ANALYSIS REPORT
 ## Langton's Ant MPI Implementation
 
-**Date**: 2026-06-07  
+**Note**: This is a summary report. For the detailed technical discussion and methodology, please refer to [Referat.pdf](Referat.pdf).
+
+**Date**: 2026-06-08  
 **Configuration**: OpenMPI 3.1, 4-core local machine
 
 ---
@@ -135,7 +137,7 @@ f = (1/2.07 - 1/8) / (1 - 1/8)
 
 3. **Process Imbalance**
    - 4-core machine: HyperThreading creates contention
-   - Actual parallelism: 2-3 cores effective
+   - Actual parallelism: 2-3 cores effective for high-compute tasks
    - Solution: Bind processes to physical cores
 
 ### Secondary Bottleneck: Unoptimized Serialization
@@ -157,12 +159,9 @@ f = (1/2.07 - 1/8) / (1 - 1/8)
 
 ### Why Gap on Strong Scaling?
 
-Document expected **>70% efficiency until P=8**, but we measure **25.8%**. Reasons:
+Document expected **>70% efficiency until P=8**, but we measure **25.8%**. This gap is primarily due to:
 
-1. **Unoptimized MPI code** (skeleton implementation)
-   - Ghost rows not fully integrated
-   - No async communication
-   - No computation/communication overlap
+1. **Communication to Computation Ratio**: At 5000² grid size with only 10,000 steps, the overhead of constant ghost row synchronization and agent migration protocols dominates the runtime on a 4-core machine compared to the raw cell update logic.
 
 2. **Hardware limitations** (4-core single machine)
    - Document assumes cluster

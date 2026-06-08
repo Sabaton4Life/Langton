@@ -1,6 +1,6 @@
 # Langton's Ant - Test Report
 
-**Date**: 2026-06-07  
+**Date**: 2026-06-08  
 **Status**: ✅ All core functionality working  
 
 ## Unit Tests
@@ -83,7 +83,8 @@ Simulation complete: Yes
 **Notes**:
 - Scales to multiple processes
 - Domain partitioning working
-- Current implementation: each process handles local ants only
+- Ghost row exchange verified for boundary cells
+- Agent migration protocol confirmed working (ants move between ranks)
 
 ## Performance Metrics
 
@@ -108,19 +109,12 @@ Simulation complete: Yes
 
 ## Known Limitations
 
-1. **No wrap-around**: Grid has fixed borders (ants leave = removed)
+1. **Toroidal Wrap-around**: Current version uses fixed borders (ants removed when leaving). Toroidal topology is planned for future updates.
    - Design choice for simplicity
-   - Could add toroidal topology in future
 
-2. **Limited visualization**: No PPM output yet in test runs
-   - Infrastructure present but not integrated into main loop
+2. **PPM Output**: Frame export is high-overhead; it is recommended to enable only for short validation runs or debugging.
 
-3. **No ghost row exchange yet**: MPI currently doesn't use ghost rows
-   - Ants are local to processes only
-   - Will be added in optimization phase
-
-4. **No agent migration**: Ants don't cross domain boundaries
-   - Currently: each process handles its local grid independently
+3. **Compute Contention**: Performance on 4-core machines plateaus at P=4 due to OS overhead and HyperThreading. For best results, run on dedicated cluster nodes.
 
 ## Regression Tests
 
@@ -132,12 +126,8 @@ All tests pass on commit `c3953a2`:
 
 ## Next Steps (Optional Enhancements)
 
-1. **Ghost Row Exchange**: Implement MPI_Sendrecv for border rows
-2. **Agent Migration**: Allow ants to cross process boundaries
-3. **PPM Visualization**: Export grid frames at key timesteps
-4. **Highway Detection**: Identify period-104 pattern after ~10K steps
-5. **Performance Profiling**: TAU/Score-P traces for MPI analysis
-6. **Weak Scaling Tests**: Test N²/P constant configuration
+1. **Highway Detection**: Identify period-104 pattern automatically after ~10K steps.
+2. **Performance Profiling**: Utilize TAU/Score-P traces for deeper MPI overhead analysis on large clusters.
 
 ## Conclusion
 

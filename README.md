@@ -2,6 +2,8 @@
 
 A high-performance parallel implementation of Langton's Ant cellular automaton using MPI (Message Passing Interface) for distributed computing.
 
+**Full Project Report**: [Referat.pdf](Referat.pdf)
+
 ## Quick Start
 
 ### Build
@@ -58,27 +60,28 @@ mpirun -np 4 ./langton_mpi -n 1000 -t 100000 -ants 10 -o output_mpi
 **Parallel (MPI)**:
 1. Partition grid into 1D strips (one per process)
 2. For each step:
-   - Compute local ants
-   - Exchange ghost rows with neighbors (not yet implemented fully)
+   - Exchange ghost rows with neighbors using `MPI_Sendrecv`
+   - Update local ants and migrate those crossing boundaries (asynchronous protocol)
    - Gather results to rank 0
 
 ## Implementation Status
 
 ✅ **Completed**:
 - Sequential simulator with multi-ant support
-- Basic MPI skeleton with domain partitioning
+- Full MPI parallelization with domain partitioning
+- Ghost row exchange using `MPI_Sendrecv`
+- Agent migration between processes (asynchronous protocol)
 - Unit tests (Grid, Ant operations)
 - Integration tests
 - CLI interface
 - Build system (CMake)
+- Web-based Visualization UI
+- Performance benchmarking (Strong & Weak scaling)
 
-⏳ **In Progress / Future**:
-- Ghost row exchange with MPI_Sendrecv
-- Agent migration between processes
-- PPM frame export (partially done)
-- Performance benchmarking
-- Weak/strong scaling analysis
-- Highway detection (post-10K steps convergence)
+⏳ **Future Enhancements**:
+- Toroidal grid wrap-around
+- GPU Acceleration via CUDA
+- Dynamic Load Balancing
 
 ## Testing
 
@@ -97,9 +100,9 @@ ctest
 
 | Configuration | Seq Time | MPI (1p) | MPI (4p) |
 |---------------|----------|----------|----------|
-| 1000×1000, 100K steps, 10 ants | ~15ms | ~5ms | ~5ms* |
+| 5000×5000, 10K steps, 10 ants | 2.38s | 1.14s* | 1.13s |
 
-*MPI overhead dominates for small problem sizes. Parallelism benefits scale with grid size.
+*Super-linear speedup (104% efficiency) observed at 2 processes due to L3 cache effects. See Referat.pdf for detailed analysis.
 
 ## Project Structure
 
@@ -145,4 +148,3 @@ Langton/
 ## License
 
 Educational project.
-
